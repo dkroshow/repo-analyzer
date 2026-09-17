@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Emit complexity signals for a repo checkout as JSON.
+
+Usage: repo-signals <repo-dir>
+
+Used by the analyze-repo command to route model tier and to build the
+coverage-contract subsystem list, and by audit-repo-security as a seed list.
+The file universe is `git ls-files` when the directory is a git checkout,
+else a sorted walk of the tree. Output is the same for the same checkout.
+The `skipped` section reports what the security scan did not read.
+No dependencies beyond stdlib.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+IGNORE_DIRS = {'.git', 'node_modules', 'vendor', 'dist', 'build', '.next',
+               'target', '__pycache__', '.venv', 'venv'}
+RUNTIME_BY_EXT = {
+    'py': 'python', 'ts': 'ts/js', 'tsx': 'ts/js', 'js': 'ts/js', 'jsx': 'ts/js',
+    'rs': 'rust', 'go': 'go', 'rb': 'ruby', 'java': 'jvm', 'kt': 'jvm',
+    'swift': 'swift', 'c': 'c/c++', 'cc': 'c/c++', 'cpp': 'c/c++', 'm': 'c/c++',
+    'cs': 'c#', 'php': 'php', 'ex': 'elixir', 'scala': 'jvm',
+}
+DOC_EXTS = {'md', 'mdx', 'rst', 'txt'}
+ENTRYPOINT_NAMES = {'Dockerfile', 'Makefile', 'docker-compose.yml', 'package.json',
+                    'pyproject.toml', 'setup.py', 'Cargo.toml', 'go.mod', 'Gemfile',
+                    'flake.nix'}
+# Editor/tooling/CI config dirs — real subsystems the contract should list but
+# that need no analysis; flagged auto_waivable so a packet omitting them does
+# not fail coverage (a packet once failed coverage for omitting .vscode).
+AUTO_WAIVABLE_DIRS = {'.vscode', '.idea', '.github', '.gitlab', '.changeset',
+                      '.husky', '.circleci', '.devcontainer', '.vs'}
+RUNTIME_MIN_FILES = 5      # ignore stray scripts when detecting runtimes
+DOMINANT_DIR_SHARE = 0.4   # descend into dirs holding this share of all files
+MAX_SUBSYSTEM_DEPTH = 3
+
+# security_indicators feed the separate /audit-repo-security skill, not
+# analyze-repo routing — suggested_tier stays a pure complexity signal.
+
+# Checklist seeds for the security-considerations page: cheap greps that
+# enumerate risk surface. A hit is something the analysis must address, not a
+# verdict. Content patterns run against text files; path patterns against
+# the file list.
+SECURITY_CONTENT_PATTERNS = {
+    'install_hooks': r'"(?:pre|post)install"\s*:|"prepare"\s*:',
+    'curl_pipe_shell': r'(?:curl|wget)[^|\n]{0,200}\|\s*(?:sudo\s+)?(?:ba|z)?sh\b',
+    'browser_control': r'--remote-debugging-port|chrome\.debugger|NativeMessagingHosts|--user-data-dir',
+    'credential_paths': r'~/\.ssh|\.aws/credentials|(?i:keychain)|\.netrc|(?i:/cookies\b)',
+    'privileged': r'\bsudo\b|LaunchDaemons|LaunchAgents|systemctl\b|\.kext\b',
+    'telemetry': r'(?i:\btelemetry\b|sentry\.io|posthog|segment\.com|analytics\.track)',
+    'binary_download': r'releases/download/|(?i:https?://\S+\.(?:tar\.gz|zip|dmg|exe|pkg)\b)',
+}
+SECURITY_PATH_PATTERNS = {
+    'install_hooks': r'(^|/)(setup\.py|build\.rs)$',
+    'privileged': r'\.(plist|service)$',
+    'browser_control': r'NativeMessagingHosts',
+}
+# The specific risk question each category must answer on the security page —
+# forces mechanism→consequence framing instead of "the code touches X".
+# In testing, models enumerated mechanisms but stopped short of the threat, so
+# a category hit ships with the exact question to close.
+SECURITY_QUESTIONS = {
+    'install_hooks': 'What runs at install time, and what can that code do to the host before the user runs anything?',
+    'curl_pipe_shell': 'What is piped to a shell, from where, and is it pinned/verified or attacker-swappable?',
+    'browser_control': 'Is the control channel (debug port / native-messaging / extension) authenticated, or can any local process attach? Which browser profile does it drive — a scratch dir, or the user\'s real profile with live sessions?',
+    'credential_paths': 'Can the tool READ stored secrets (cookies, keychain, ssh, tokens) — name the specific API/call — or only reference these paths incidentally?',
+    'privileged': 'What persistent or privileged component is installed (daemon/service/sudo), what can it do, and how long does it live after the command exits?',
+    'telemetry': 'What data leaves the machine, to whom, and can it be disabled?',
+    'binary_download': 'What prebuilt artifact is fetched and executed, from where, and is its integrity checked (hash/signature/pinned release)?',
+}
+SECURITY_MAX_HITS = 20         # per indicator; a seed list, not a full audit
+SECURITY_MAX_FILE_BYTES = 262144
+
+
+def git_files(root):
+    """Tracked files from git, or None if `root` is not a git checkout."""
+    try:
+        out = subprocess.run(['git', '-C', root, 'ls-files', '-z'],
+                             capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    files = [f.decode('utf-8', errors='replace') for f in out.split(b'\0') if f]
+    files = [f for f in files if not set(f.split('/')) & IGNORE_DIRS]
+    return sorted(f for f in files if os.path.isfile(os.path.join(root, f)))
+
+
+def walk_files(root):
+    files = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in IGNORE_DIRS)
+        for name in sorted(filenames):
+            files.append(os.path.relpath(os.path.join(dirpath, name), root))
+    return files
+
+
+def ext_of(path):
+    base = os.path.basename(path)
+    if '.' not in base[1:]:
+        return ''
+    return base.rsplit('.', 1)[1].lower()
+
+
+def count_by_dir(files, prefix, depth):
+    """File counts per directory at `depth` path components under `prefix`."""
+    counts = {}
+    for f in files:
+        if prefix and not f.startswith(prefix + os.sep):
+            continue
+        rel = f[len(prefix) + 1:] if prefix else f
+        parts = rel.split(os.sep)
+        if len(parts) <= depth:
+            continue
+        key = os.path.join(prefix, *parts[:depth]) if prefix else os.path.join(*parts[:depth])
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def enumerate_subsystems(files):
+    """Top-level dirs, descending one level into any dominant dir, up to
+    MAX_SUBSYSTEM_DEPTH — deep monorepos hide subsystems below depth 1."""
+    total = len(files) or 1
+    subsystems = []
+    frontier = [('', 1)]
+    while frontier:
+        prefix, depth = frontier.pop(0)
+        for path, count in sorted(count_by_dir(files, prefix, 1).items(),
+                                  key=lambda kv: -kv[1]):
+            if count / total >= DOMINANT_DIR_SHARE and depth < MAX_SUBSYSTEM_DEPTH:
+                frontier.append((path, depth + 1))
+            entry = {'path': path, 'files': count}
+            if os.path.basename(path) in AUTO_WAIVABLE_DIRS:
+                entry['auto_waivable'] = True
+            subsystems.append(entry)
+    return subsystems
+
+
+def scan_security(root, files):
+    """Grep the file list for risk-surface seeds. Returns (indicators, skipped);
+    `skipped` names every file and category the scan did not fully read."""
+    content_res = {k: re.compile(v) for k, v in SECURITY_CONTENT_PATTERNS.items()}
+    path_res = {k: re.compile(v) for k, v in SECURITY_PATH_PATTERNS.items()}
+    hits = {k: [] for k in set(content_res) | set(path_res)}
+    skipped = {'too_large': [], 'binary': [], 'unreadable': [], 'capped_categories': []}
+
+    def add(key, entry):
+        if len(hits[key]) < SECURITY_MAX_HITS:
+            hits[key].append(entry)
+
+    for f in files:
+        for key, rx in path_res.items():
+            if rx.search(f):
+                add(key, {'file': f, 'match': 'path'})
+        full = os.path.join(root, f)
+        try:
+            if os.path.getsize(full) > SECURITY_MAX_FILE_BYTES:
+                skipped['too_large'].append(f)
+                continue
+            with open(full, 'rb') as fh:
+                raw = fh.read()
+            if b'\0' in raw[:1024]:
+                skipped['binary'].append(f)
+                continue
+            text = raw.decode('utf-8', errors='replace')
+        except OSError:
+            skipped['unreadable'].append(f)
+            continue
+        for key, rx in content_res.items():
+            for m in rx.finditer(text):
+                line = text.count('\n', 0, m.start()) + 1
+                add(key, {'file': f, 'line': line,
+                          'match': m.group(0)[:80].strip()})
+                if len(hits[key]) >= SECURITY_MAX_HITS:
+                    break
+    skipped['capped_categories'] = sorted(k for k, v in hits.items()
+                                          if len(v) >= SECURITY_MAX_HITS)
+    indicators = {k: {'must_answer': SECURITY_QUESTIONS.get(k, ''), 'hits': v}
+                  for k, v in sorted(hits.items()) if v}
+    return indicators, skipped
+
+
+def main():
+    if len(sys.argv) != 2 or not os.path.isdir(sys.argv[1]):
+        print(__doc__, file=sys.stderr)
+        sys.exit(2)
+    root = os.path.abspath(sys.argv[1])
+    files = git_files(root)
+    file_source = 'git ls-files'
+    if files is None:
+        files = walk_files(root)
+        file_source = 'directory walk (not a git checkout)'
+    indicators, skipped = scan_security(root, files)
+    exts = {}
+    for f in files:
+        e = ext_of(f)
+        exts[e] = exts.get(e, 0) + 1
+    runtimes = sorted({RUNTIME_BY_EXT[e] for e, n in exts.items()
+                       if e in RUNTIME_BY_EXT and n >= RUNTIME_MIN_FILES})
+    doc_files = sum(n for e, n in exts.items() if e in DOC_EXTS)
+    top_dirs = sorted(count_by_dir(files, '', 1))
+    entrypoints = sorted({f for f in files if os.path.basename(f) in ENTRYPOINT_NAMES
+                          and f.count(os.sep) <= 1})
+    doc_ratio = doc_files / (len(files) or 1)
+
+    if doc_ratio > 0.7 and len(runtimes) <= 1 and len(files) < 300:
+        tier = 'low'
+    elif (len(runtimes) >= 3 or len(top_dirs) >= 25 or len(files) >= 1000
+          or (len(runtimes) >= 2 and len(files) >= 500)):
+        tier = 'high'
+    else:
+        tier = 'default'
+
+    print(json.dumps({
+        'repo': root,
+        'file_source': file_source,
+        'file_count': len(files),
+        'top_level_dirs': len(top_dirs),
+        'runtimes': runtimes,
+        'doc_ratio': round(doc_ratio, 2),
+        'extensions_top': dict(sorted(exts.items(), key=lambda kv: -kv[1])[:8]),
+        'entrypoints': entrypoints,
+        'suggested_tier': tier,
+        'security_indicators': indicators,
+        'skipped': skipped,
+        'subsystems': enumerate_subsystems(files),
+    }, indent=2))
+
+
+if __name__ == '__main__':
+    main()
