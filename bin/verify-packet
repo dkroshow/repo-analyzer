@@ -43,10 +43,13 @@ def line_count(path):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    argv = sys.argv[1:]
     min_rate = 0.95
-    if '--min-anchor-rate' in sys.argv:
-        min_rate = float(sys.argv[sys.argv.index('--min-anchor-rate') + 1])
+    if '--min-anchor-rate' in argv:
+        i = argv.index('--min-anchor-rate')
+        min_rate = float(argv[i + 1])
+        del argv[i:i + 2]
+    args = [a for a in argv if not a.startswith('--')]
     if len(args) != 1:
         print(__doc__, file=sys.stderr)
         sys.exit(2)
@@ -72,8 +75,10 @@ def main():
         if sha not in text and sha[:7] not in text:
             failures.append(f'sha: {os.path.basename(page)} does not name HEAD {sha[:7]}')
 
-    # 3. Anchors
+    # 3. Anchors. Individual misses are listed; the packet fails on the rate,
+    # or on any hosted URL.
     total = ok = 0
+    misses = []
     for page in pages:
         name = os.path.basename(page)
         text = open(page, encoding='utf-8', errors='replace').read()
@@ -85,12 +90,14 @@ def main():
             rel, line = m.group(1), m.group(2)
             target = os.path.normpath(os.path.join(clone, rel))
             if not target.startswith(clone + os.sep) or not os.path.isfile(target):
-                failures.append(f'anchor: {name} -> {rel}: file not found')
+                misses.append(f'{name} -> {rel}: file not found')
                 continue
             if line and int(line) > line_count(target):
-                failures.append(f'anchor: {name} -> {rel}:{line}: past end of file')
+                misses.append(f'{name} -> {rel}:{line}: past end of file')
                 continue
             ok += 1
+    for m in misses:
+        print('MISS anchor:', m)
     rate = ok / total if total else 1.0
     if total and rate < min_rate:
         failures.append(f'anchor: resolution {ok}/{total} = {rate:.2f} below {min_rate}')

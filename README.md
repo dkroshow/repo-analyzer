@@ -104,13 +104,15 @@ Be clear about what this is: two prompts and two small scripts.
 - A prompt cannot make the audit resistant to a repo that tries to talk to
   the agent. Both skills tell the agent to treat repo content as untrusted,
   and that is all a prompt can do.
-- There is no example packet yet. Publishing one means publishing claims
-  about someone else's code, so the first example will be of this repo.
+- The only example packet is of this repo (`examples/repo-analyzer/`).
+  Publishing a packet means publishing claims about someone else's code, so
+  there are no others.
 
 ## Repo map
 
 - `skills/` — the two skills.
 - `bin/` — the two tools.
+- `examples/` — one example packet: this repo, analyzed by itself.
 - `data/` — your local packets and clones, ignored by git.
 
 ## License

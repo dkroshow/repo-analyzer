@@ -1,24 +1,13 @@
 # Local working data: one subfolder per analyzed repo (analysis/ + clone/).
 # Your analyses are yours; they are not part of this repo.
 data/
-repos.json
 
 # Local agent and editor files
 .env
 mcp.json
-.claude/settings.local.json
+.claude/
 CLAUDE.local.md
 AGENTS.override.md
-.project/
 
 __pycache__/
 .DS_Store
-**/.DS_Store
-
-# Local material not part of this repo
-evals/
-docs/
-examples/
-QUEUE.md
-.claude/
-bin/update-repo-index
