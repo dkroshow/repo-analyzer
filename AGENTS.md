@@ -9,12 +9,17 @@ repo-analyzer is two skill prompts (`skills/`) and two small Python tools
 ./install.sh                          # symlink skills and tools; safe to re-run
 bin/repo-signals <clone-dir>          # JSON complexity and security signals
 bin/verify-packet data/<repo>         # check a packet's anchors, SHA, coverage
-python3 -m py_compile bin/repo-signals bin/verify-packet   # syntax check
-python3 -m pyflakes bin/*             # lint, if pyflakes is installed
 ```
 
-There is no test suite; check a change by running `bin/repo-signals` on a
-real clone and `bin/verify-packet` on a real packet, and reading the output.
+**Final check** — run once on the exact tree you will commit:
+
+```sh
+python3 -m py_compile bin/repo-signals bin/verify-packet && python3 -m pyflakes bin/repo-signals bin/verify-packet && bin/repo-signals . > /dev/null
+```
+
+There is no test suite. When you change a tool, also run it on a real clone
+or packet under `data/` and read the output. An older local packet can fail
+for reasons your change did not cause.
 
 ## Conventions
 
