@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS=(analyze-repo audit-repo-security)
+SKILLS=(analyze-repo should-i-install)
 TOOLS=(repo-signals verify-packet)
 
 link() { # link <target> <linkpath>
@@ -44,4 +44,4 @@ esac
 
 echo
 echo "Done. Codex loads its prompt list at process start — relaunch any running"
-echo "Codex session to see /analyze-repo and /audit-repo-security."
+echo "Codex session to see /analyze-repo and /should-i-install."

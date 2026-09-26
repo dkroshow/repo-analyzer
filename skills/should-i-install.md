@@ -1,4 +1,4 @@
-# Audit Repo Security Command
+# Should I Install Command
 
 **Purpose:** Answer one question with source-grounded evidence — *is this repo
 safe to install and run on my machine?* Deliberately invoked when you are

@@ -4,7 +4,7 @@
 Usage: repo-signals <repo-dir>
 
 Used by the analyze-repo command to route model tier and to build the
-coverage-contract subsystem list, and by audit-repo-security as a seed list.
+coverage-contract subsystem list, and by should-i-install as a seed list.
 The file universe is `git ls-files` when the directory is a git checkout,
 else a sorted walk of the tree. Output is the same for the same checkout.
 The `skipped` section reports what the security scan did not read.
@@ -37,7 +37,7 @@ RUNTIME_MIN_FILES = 5      # ignore stray scripts when detecting runtimes
 DOMINANT_DIR_SHARE = 0.4   # descend into dirs holding this share of all files
 MAX_SUBSYSTEM_DEPTH = 3
 
-# security_indicators feed the separate /audit-repo-security skill, not
+# security_indicators feed the separate /should-i-install skill, not
 # analyze-repo routing — suggested_tier stays a pure complexity signal.
 
 # Checklist seeds for the security-considerations page: cheap greps that

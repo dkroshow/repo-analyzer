@@ -5,7 +5,7 @@ repository.
 
 - `/analyze-repo` reads a repo and writes a research packet on what it is
   and how it works.
-- `/audit-repo-security` reads a repo and tells you whether it looks safe to
+- `/should-i-install` reads a repo and tells you whether it looks safe to
   install.
 
 The skills run inside your coding agent. There is no separate API key, no
@@ -24,7 +24,7 @@ measurement decides how capable a model the job needs, so small repos stay
 cheap. The agent then lists the repo's major parts and must cover each one,
 or say plainly that it skipped it. Nothing gets silently left out.
 
-**`/audit-repo-security` answers "should I install this on my machine?"**
+**`/should-i-install` answers "should I install this on my machine?"**
 It is meant for occasional, careful use, and it uses the strongest model by
 default. It instructs the agent to read the code and never run it. For each risky
 feature it
@@ -63,6 +63,10 @@ The installer symlinks the skills into `~/.claude/commands/` (Claude Code) and
 `~/.codex/prompts/` (Codex), and the tools into `~/.local/bin/`. Codex reads
 its prompt list when it starts, so restart a running Codex session to see
 the new skills.
+
+`/should-i-install` was called `/audit-repo-security` before. If you
+installed the old name, delete its symlinks in `~/.claude/commands/` and
+`~/.codex/prompts/`, then re-run `./install.sh`.
 
 ## Tools
 

@@ -54,7 +54,7 @@ When invoked:
    5+ files, doc ratio, and a file-count-weighted subsystem list that descends
    one level into any directory holding 40%+ of the files. (The JSON also
    carries `security_indicators`; analyze-repo ignores them — install-time and
-   safety analysis is the separate `/audit-repo-security` skill, invoked
+   safety analysis is the separate `/should-i-install` skill, invoked
    deliberately when someone is considering installing the repo.)
 2. File universe: `git ls-files` inside the clone (this sees exactly what the
    repo tracks — no host API needed).
@@ -135,7 +135,7 @@ source, explicitly labeled as derived from static reading, not executed:
 - update/uninstall paths if the repo defines them.
 
 Safety/"is it safe to install" analysis is intentionally NOT part of this skill
-— it lives in `/audit-repo-security`, invoked deliberately when someone is
+— it lives in `/should-i-install`, invoked deliberately when someone is
 weighing installation. Keep analyze-repo about understanding the code.
 
 **Scaling up:** for large repos (roughly 1000+ tracked files or 6+ deep topic
