@@ -1,19 +1,17 @@
 # repo-analyzer
 
-Two skills for coding agents that help you evaluate another
-repository.
+Want to learn more about a Github repo? Two simple skills to point your agents at:
 
 - `/analyze-repo` reads a repo and writes a research packet on what it is
   and how it works.
 - `/should-i-install` reads a repo and tells you whether it looks safe to
   install.
 
-The skills run inside your coding agent. There is no separate API key, no
+Your coding agent runs the skills. There's no separate API key, no
 database, and no search index. The agent clones the repo and reads it with
 ordinary tools.
 
-For context, this was built for internal purposes and released publicly Sept 2026. One
-maintainer, best effort. Issues and pull requests are welcome.
+Built for internal purposes, open sourced because why not. 
 
 ## The two skills
 
