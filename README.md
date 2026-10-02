@@ -88,6 +88,10 @@ installed the old name, delete its symlinks in `~/.claude/commands/` and
   that, so the agent's own permissions are the real limit.
 - `/analyze-repo` adds `data/` to the `.gitignore` of the project you run it
   from, if it is not already there.
+- Both skills have an optional step that looks up the repo's OpenSSF
+  Scorecard result at `api.scorecard.dev`. That sends the repo's name to
+  that service. It needs no token, and the agent should skip it for a
+  private repo.
 - Whatever the agent reads goes to your model provider, as with any agent
   session. Do not point the skills at a repo you cannot share with that
   provider.

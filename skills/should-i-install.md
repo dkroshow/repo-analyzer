@@ -57,6 +57,35 @@ hunt for it — a floor, not the ceiling. Also read: README install section, all
 manifests + lockfiles, CI workflows, and any `install`/`setup`/`bootstrap`
 script.
 
+**Optional: OpenSSF Scorecard.** For a GitHub repo, fetch its precomputed
+score: `curl -s https://api.scorecard.dev/projects/github.com/<owner>/<repo>`.
+It needs no token and returns JSON with a scan `date`, the scanned `commit`,
+and a 0-10 score per check. A 404 means Scorecard has no data; that is
+neutral, not a bad sign. This sends the repo name to a third party, so skip
+it for a private repo.
+
+Scorecard grades how the project is run, not what its code does. It says
+nothing about install hooks, telemetry, credential reads, or background
+services, so it never answers a dimension below on its own and never sets
+the verdict. Use it as leads:
+
+- Read single checks and their `details`, never the overall score. A check
+  scored -1 is inconclusive and counts for nothing either way.
+- Supply chain: `Vulnerabilities`, `Pinned-Dependencies`, `Binary-Artifacts`.
+- Provenance: `Maintained`, `Code-Review`, `Branch-Protection`,
+  `Signed-Releases`, `Dangerous-Workflow`, `Token-Permissions`. These cover
+  host settings a clone cannot show.
+- A low check means "look harder at that dimension". `Maintained` scores 0
+  for any repo under 90 days old. `Signed-Releases` only finds signature
+  files; it does not verify them.
+- The score describes the commit Scorecard scanned. Record the scan date and
+  say whether that commit matches the pinned SHA.
+
+If `scorecard` is already installed, `scorecard --local=data/<repo>/clone
+--format=json --checks=Vulnerabilities,Pinned-Dependencies,Binary-Artifacts,Dangerous-Workflow,Token-Permissions`
+scores the pinned checkout itself. Its `Vulnerabilities` check queries
+osv.dev. Do not install Scorecard for this.
+
 ### 3. Audit each dimension
 
 Answer every `must_answer` question whose category has hits, plus these

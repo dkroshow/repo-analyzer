@@ -63,6 +63,14 @@ When invoked:
 4. Skim directory structure to identify the real subsystems, not just the
    advertised ones. Tests and config are documentation too. Note anything
    unusually large or unusually absent.
+5. Optional, for a public GitHub repo: fetch its OpenSSF Scorecard result with
+   `curl -s https://api.scorecard.dev/projects/github.com/<owner>/<repo>`
+   (no token; a 404 means no data, which is neutral). It grades how the
+   project is run: maintenance, code review, branch protection, pinned
+   dependencies, known vulnerabilities. Record the scan date, the scanned
+   commit, and the notable per-check scores as project-health context. It is
+   not a safety verdict and says nothing about what the code does; how to
+   read it for an install decision lives in `/should-i-install`.
 
 ### Stage 3: Route
 
@@ -173,7 +181,8 @@ Then persist:
      `| \`path\` | files | disposition |`, where disposition names the pages
      or says "waived: <reason>"
    - **Evidence And Caveats** — pinned SHA, versions, license, verification
-     environment limits, executed checks, and the `verify-packet` summary
+     environment limits, executed checks, the `verify-packet` summary, and
+     the Scorecard result if you fetched one (scan date, scanned commit)
    - **Staleness Trigger** — which upstream changes invalidate this packet
    - **Memory Decision** — why this was persisted and how to treat it
      (research context, not host-project policy)
