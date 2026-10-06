@@ -117,7 +117,8 @@ def main():
             if line:
                 page_line = text.count('\n', 0, m.start()) + 1
                 group = cited.setdefault((name, page_line), (page_lines[page_line - 1].strip(), []))
-                group[1].append((rel, line, sources[target][int(line) - 1]))
+                source = sources[target][int(line) - 1] if int(line) else '(no line 0)'
+                group[1].append((rel, line, source))
     if cited:
         print('Cited lines: check that each source line supports the claim above it.')
         for (name, page_line), (claim, anchors) in cited.items():
