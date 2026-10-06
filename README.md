@@ -75,7 +75,8 @@ installed the old name, delete its symlinks in `~/.claude/commands/` and
   only the Python standard library.
 - `bin/verify-packet data/<repo>` checks a finished packet: every file-and-
   line link resolves at the pinned commit, every page names that commit, and
-  every major part of the repo is covered or waived. `/analyze-repo` runs it
+  every major part of the repo is covered or waived. It also prints each
+  cited source line under the claim that cites it. `/analyze-repo` runs it
   before it keeps a packet.
 
 ## What it touches
@@ -101,8 +102,10 @@ installed the old name, delete its symlinks in `~/.claude/commands/` and
 Be clear about what this is: two prompts and two small scripts.
 
 - `verify-packet` checks links, the pinned commit, and coverage. It cannot
-  check whether a page is correct. The agent must still run it; nothing
-  forces that.
+  check whether a cited line supports its claim or whether a page is
+  correct, so its PASS says "claim support not checked". The agent must
+  compare the printed lines with the claims, and must run it at all;
+  nothing forces either.
 - `repo-signals` caps each security category at 20 hits and reports the cap
   and the files it skipped, but its hits are leads, and many are noise.
 - The model tiers in `skills/analyze-repo.md` are advice for whoever launches

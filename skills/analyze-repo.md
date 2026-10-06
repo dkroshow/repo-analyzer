@@ -166,7 +166,15 @@ of this repo; on PATH via `install.sh`). It checks:
    `auto_waivable` ones.
 3. **Packet shape:** all four required files present; the SHA named in each.
 
-Paste its summary line into the README's Evidence section. On failure, fix
+These checks are structural: an anchor that points at a blank or unrelated
+line still resolves. So `verify-packet` also prints every cited source line
+under the page line that cites it. Read that list and compare each source
+line with its claim; fix any anchor that does not show what the claim says,
+then run it again. A passing run says "structural checks PASS; claim support
+not checked" — the comparison is yours.
+
+Paste its summary line into the README's Evidence section, with a note that
+you compared the cited lines. On failure, fix
 surgically: regenerate only the failing pages or uncovered subsystems at the
 next tier up — not the whole packet — and run it again. Do not persist a
 failing packet.
